@@ -60,6 +60,7 @@ module NewRelic
           else
             install_browser_monitoring(rails_config)
             install_agent_hooks(rails_config)
+            install_streaming_hooks(rails_config)
           end
         rescue => e
           ::NewRelic::Agent.logger.error("Failure during init_config for Rails. Is Rails required in a non-Rails app? Set NEW_RELIC_FRAMEWORK=ruby to avoid this message.",
@@ -91,6 +92,22 @@ module NewRelic
             ::NewRelic::Agent.logger.debug("Installed New Relic Browser Monitoring middleware")
           rescue => e
             ::NewRelic::Agent.logger.warn("Error installing New Relic Browser Monitoring middleware", e)
+          end
+        end
+
+        def install_streaming_hooks(config)
+          return if defined?(@streaming_hooks_installed) && @streaming_hooks_installed
+          @streaming_hooks_installed = true
+          return if config.nil? || !config.respond_to?(:middleware)
+          begin
+            require 'new_relic/rack/streaming_hooks'
+            return unless NewRelic::Rack::StreamingHooks.needed?
+            # we need this to be as early in the stack since this middleware needs to control the
+            # outer-most segment.
+            config.middleware.insert 0, NewRelic::Rack::AgentHooks
+            ::NewRelic::Agent.logger.debug("Installed New Relic Streaming Hooks middleware")
+          rescue => e
+            ::NewRelic::Agent.logger.warn("Error installing New Relic Streaming Hooks middleware", e)
           end
         end
 
